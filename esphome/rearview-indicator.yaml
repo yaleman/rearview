@@ -1,0 +1,96 @@
+esphome:
+  name: rearview-indicator
+  friendly_name: Rearview Indicator
+  on_loop:
+    then:
+      - lambda: |-
+          static bool passkey_configured = false;
+          static esp_err_t last_error = ESP_OK;
+          if (passkey_configured) {
+            return;
+          }
+
+          uint32_t passkey = 123456;
+          const auto result = esp_ble_gap_set_security_param(
+              ESP_BLE_SM_SET_STATIC_PASSKEY,
+              &passkey,
+              sizeof(passkey));
+          switch (result) {
+            case ESP_OK:
+              passkey_configured = true;
+              ESP_LOGI("rearview_ble", "BLE passkey configured");
+              break;
+            case ESP_ERR_INVALID_STATE:
+              break;
+            default:
+              if (result != last_error) {
+                ESP_LOGE("rearview_ble", "Failed to configure BLE passkey: %s", esp_err_to_name(result));
+              }
+              break;
+          }
+          last_error = result;
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components:
+      - esp32_ble_server
+
+logger:
+
+esp32_ble:
+  name: Rearview Light
+  io_capability: display_only
+  auth_req_mode: sc_mitm_bond
+  min_key_size: 16
+  max_key_size: 16
+  max_connections: 1
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: indicator_light
+    name: Indicator Light
+    pin: GPIO8
+    num_leds: 1
+    chipset: WS2812
+    rgb_order: GRB
+    restore_mode: ALWAYS_OFF
+
+esp32_ble_server:
+  manufacturer: Rearview
+  model: RGB Indicator
+  max_clients: 1
+  services:
+    - uuid: 898a0c20-6d38-4a49-9f84-f942b4cd9380
+      advertise: true
+      characteristics:
+        - id: colour_characteristic
+          uuid: 898a0c21-6d38-4a49-9f84-f942b4cd9380
+          description: RGB colour and brightness
+          write: true
+          on_write:
+            then:
+              - lambda: |-
+                  if (x.size() != 4) {
+                    ESP_LOGW("rearview_ble", "Expected 4 colour bytes, received %u", x.size());
+                    return;
+                  }
+
+                  if ((x[0] == 0 && x[1] == 0 && x[2] == 0) || x[3] == 0) {
+                    id(indicator_light).turn_off().perform();
+                    return;
+                  }
+
+                  auto call = id(indicator_light).turn_on();
+                  call.set_rgb(
+                      static_cast<float>(x[0]) / 255.0f,
+                      static_cast<float>(x[1]) / 255.0f,
+                      static_cast<float>(x[2]) / 255.0f);
+                  call.set_brightness(static_cast<float>(x[3]) / 255.0f);
+                  call.perform();
