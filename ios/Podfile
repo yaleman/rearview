@@ -1,11 +1,14 @@
 # Resolve react_native_pods.rb with node to allow for hoisting
+$VCEnableLocation = false
+$VCEnableFrameProcessors = false
+
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+platform :ios, '26.0'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']

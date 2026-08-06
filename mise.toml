@@ -1,0 +1,31 @@
+[env]
+_.file = { path = ".envrc", redact = true }
+
+[tasks.models]
+description = "Download and verify bundled model files"
+run = "./scripts/fetch-models.sh"
+sources = ["scripts/fetch-models.sh"]
+outputs = [
+  "models/SmolVLM-500M-Instruct-Q8_0.gguf",
+  "models/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf",
+]
+
+[tasks."device:build"]
+description = "Build a signed Release app for the configured device"
+depends = ["models"]
+run = "./scripts/device.sh build"
+
+[tasks."device:install"]
+description = "Install the current Release app on the configured device"
+depends = ["device:build"]
+run = "./scripts/device.sh install"
+
+[tasks."device:launch"]
+description = "Launch the installed app on the configured device"
+depends = ["device:install"]
+run = "./scripts/device.sh launch"
+
+[tasks.device]
+description = "Build, install, and launch on the configured device"
+depends = ["models"]
+run = "./scripts/device.sh deploy"

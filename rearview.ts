@@ -1,59 +1,21 @@
 import RNFS from 'react-native-fs';
-import {initLlama} from 'llama.rn';
+import { initLlama } from 'llama.rn';
+
+export const DEFAULT_PROMPT = "describe what's in this image";
 
 const MODEL_NAME = 'SmolVLM-500M-Instruct-Q8_0.gguf';
 const PROJECTOR_NAME = 'mmproj-SmolVLM-500M-Instruct-Q8_0.gguf';
-
-const MODEL_URL =
-  'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/' +
-  MODEL_NAME;
-
-const PROJECTOR_URL =
-  'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/' +
-  PROJECTOR_NAME;
-
-const MODEL_PATH = `${RNFS.DocumentDirectoryPath}/${MODEL_NAME}`;
-const PROJECTOR_PATH = `${RNFS.DocumentDirectoryPath}/${PROJECTOR_NAME}`;
+const PROMPT_PATH = `${RNFS.DocumentDirectoryPath}/prompt.txt`;
 
 let context: Awaited<ReturnType<typeof initLlama>> | null = null;
+let loading: Promise<void> | null = null;
 
 type StatusCallback = (message: string) => void;
 
-async function ensureDownloaded(
-  url: string,
-  path: string,
-  label: string,
-  status: StatusCallback,
-): Promise<void> {
-  if (await RNFS.exists(path)) {
-    const file = await RNFS.stat(path);
-    status(`${label} already downloaded: ${file.size} bytes`);
-    return;
-  }
-
-  status(`Downloading ${label}...`);
-
-  const download = RNFS.downloadFile({
-    fromUrl: url,
-    toFile: path,
-    progressDivider: 5,
-    progress: event => {
-      if (event.contentLength > 0) {
-        const percent = Math.floor(
-          (event.bytesWritten / event.contentLength) * 100,
-        );
-        status(`Downloading ${label}: ${percent}%`);
-      }
-    },
-  });
-
-  const result = await download.promise;
-
-  if (result.statusCode < 200 || result.statusCode >= 300) {
-    await RNFS.unlink(path).catch(() => undefined);
-    throw new Error(
-      `Downloading ${label} returned HTTP ${result.statusCode}`,
-    );
+export class EmptyPromptError extends Error {
+  constructor() {
+    super('Prompt cannot be empty');
+    this.name = 'EmptyPromptError';
   }
 }
 
@@ -61,60 +23,84 @@ function fileURL(path: string): string {
   return path.startsWith('file://') ? path : `file://${path}`;
 }
 
+export async function loadSavedPrompt(): Promise<string> {
+  if (!(await RNFS.exists(PROMPT_PATH))) {
+    return DEFAULT_PROMPT;
+  }
+
+  const prompt = await RNFS.readFile(PROMPT_PATH, 'utf8');
+  return prompt.trim() === '' ? DEFAULT_PROMPT : prompt;
+}
+
+export async function savePrompt(prompt: string): Promise<void> {
+  if (prompt.trim() === '') {
+    throw new EmptyPromptError();
+  }
+
+  await RNFS.writeFile(PROMPT_PATH, prompt, 'utf8');
+}
+
+async function initializeRearview(status: StatusCallback): Promise<void> {
+  status('Loading bundled language model…');
+
+  const nextContext = await initLlama({
+    model: MODEL_NAME,
+    is_model_asset: true,
+    n_gpu_layers: 99,
+    n_ctx: 512,
+    ctx_shift: false,
+    flash_attn: true,
+  });
+
+  try {
+    status('Loading bundled vision projector…');
+
+    const multimodalLoaded = await nextContext.initMultimodal({
+      path: fileURL(`${RNFS.MainBundlePath}/${PROJECTOR_NAME}`),
+      use_gpu: true,
+      image_min_tokens: 64,
+      image_max_tokens: 256,
+    });
+
+    if (!multimodalLoaded) {
+      throw new Error('Failed to initialise multimodal support');
+    }
+
+    const support = await nextContext.getMultimodalSupport();
+
+    if (!support.vision) {
+      throw new Error('Loaded projector does not report vision support');
+    }
+
+    context = nextContext;
+    status('Model ready');
+  } catch (error) {
+    await nextContext.release();
+    throw error;
+  }
+}
+
 export async function loadRearview(
   status: StatusCallback = console.log,
 ): Promise<void> {
   if (context !== null) {
-    status('Model already loaded');
+    status('Model ready');
     return;
   }
 
-  await ensureDownloaded(MODEL_URL, MODEL_PATH, 'model', status);
-  await ensureDownloaded(
-    PROJECTOR_URL,
-    PROJECTOR_PATH,
-    'vision projector',
-    status,
-  );
-
-  status('Loading language model on CPU...');
-
-  context = await initLlama({
-    model: fileURL(MODEL_PATH),
-
-    // The A11/iPhone X cannot use llama.rn's current Metal backend.
-    n_gpu_layers: 0,
-
-    // Keep this modest while checking whether the phone survives.
-    n_ctx: 1024,
-
-    // Required for multimodal positioning.
-    ctx_shift: false,
-  });
-
-  status('Loading vision projector on CPU...');
-
-  const multimodalLoaded = await context.initMultimodal({
-    path: fileURL(PROJECTOR_PATH),
-    use_gpu: false,
-  });
-
-  if (!multimodalLoaded) {
-    context = null;
-    throw new Error('Failed to initialise multimodal support');
+  if (loading === null) {
+    loading = initializeRearview(status).finally(() => {
+      loading = null;
+    });
   }
 
-  const support = await context.getMultimodalSupport();
-
-  if (!support.vision) {
-    context = null;
-    throw new Error('Loaded projector does not report vision support');
-  }
-
-  status('Model and vision projector loaded');
+  await loading;
 }
 
-export async function describeImage(imagePath: string): Promise<{
+export async function describeImage(
+  imagePath: string,
+  prompt: string,
+): Promise<{
   text: string;
   timings: unknown;
   elapsedMilliseconds: number;
@@ -123,7 +109,11 @@ export async function describeImage(imagePath: string): Promise<{
     throw new Error('Model has not been loaded');
   }
 
-  const started = performance.now();
+  if (prompt.trim() === '') {
+    throw new EmptyPromptError();
+  }
+
+  const started = Date.now();
 
   const result = await context.completion({
     messages: [
@@ -132,7 +122,7 @@ export async function describeImage(imagePath: string): Promise<{
         content: [
           {
             type: 'text',
-            text: 'Name the most important object or hazard ahead. Maximum six words.',
+            text: prompt,
           },
           {
             type: 'image_url',
@@ -143,8 +133,6 @@ export async function describeImage(imagePath: string): Promise<{
         ],
       },
     ],
-
-    // Six words can still consume more than six tokens.
     n_predict: 12,
     temperature: 0,
   });
@@ -152,6 +140,6 @@ export async function describeImage(imagePath: string): Promise<{
   return {
     text: result.text.trim(),
     timings: result.timings,
-    elapsedMilliseconds: performance.now() - started,
+    elapsedMilliseconds: Date.now() - started,
   };
 }

@@ -1,0 +1,3 @@
+# Copy this file to .envrc and set values from Xcode and `xcrun devicectl list devices`.
+REARVIEW_DEVICE_ID="device-identifier"
+REARVIEW_DEVELOPMENT_TEAM="team-identifier"
