@@ -44,6 +44,11 @@ bundle exec pod install --project-directory=ios
 mise run models
 ```
 
+The Podfile builds React Native core and its native dependencies from source.
+React Native 0.86.2's prebuilt iOS framework omits C++ symbols required by
+generated components used by the app, so do not re-enable the prebuilt pods
+without first verifying a complete iOS link.
+
 The model files are downloaded into the ignored `models/` directory and bundled
 into the iOS app by the Xcode project.
 
