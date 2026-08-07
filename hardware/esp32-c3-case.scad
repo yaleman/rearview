@@ -1,8 +1,8 @@
-// Open tray for the 20 mm x 25 mm ESP32-C3 board used by Rearview.
+// Open tray for the 20 mm x 26 mm ESP32-C3 board used by Rearview.
 // The USB connector faces the centred opening at y = 0.
 
 board_width = 20;
-board_length = 25;
+board_length = 26;
 
 wall_thickness = 2;
 base_thickness = 2;

@@ -119,7 +119,7 @@ documented in [`esphome/README.md`](esphome/README.md).
 
 ### ESP32-C3 case
 
-`hardware/esp32-c3-case.scad` is a printable tray for the 20 x 25 mm ESP32-C3
+`hardware/esp32-c3-case.scad` is a printable tray for the 20 x 26 mm ESP32-C3
 board. It has a 2 mm base and 2 mm walls. The USB end wraps 3 mm inward on each
 side, leaving a centred 14.6 mm opening. The model allows 0.3 mm clearance around
 the board and defaults to walls 6 mm above the base; these values are parameters
