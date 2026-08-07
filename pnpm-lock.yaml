@@ -48,9 +48,6 @@ importers:
       '@react-native-community/cli':
         specifier: 20.1.0
         version: 20.1.0(supports-color@8.1.1)(typescript@5.9.3)
-      '@react-native-community/cli-platform-android':
-        specifier: 20.1.0
-        version: 20.1.0
       '@react-native-community/cli-platform-ios':
         specifier: 20.1.0
         version: 20.1.0
