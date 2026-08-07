@@ -23,7 +23,7 @@ esphome:
           switch (result) {
             case ESP_OK:
               passkey_configured = true;
-              ESP_LOGI("rearview_ble", "BLE passkey configured");
+              ESP_LOGI("rearview_ble", "BLE static passkey configured: %06u", static_cast<unsigned int>(passkey));
               break;
             case ESP_ERR_INVALID_STATE:
               break;
@@ -54,10 +54,193 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
-  - id: has_rgb_command
-    type: bool
+  - id: display_mode
+    type: uint8_t
     restore_value: false
-    initial_value: "false"
+    initial_value: "0"
+  - id: last_text
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+  - id: last_flash_duration
+    type: uint16_t
+    restore_value: false
+    initial_value: "1000"
+  - id: last_flash_intensity
+    type: uint8_t
+    restore_value: false
+    initial_value: "255"
+
+script:
+  - id: render_rgb_command
+    mode: restart
+    parameters:
+      red: int
+      green: int
+      blue: int
+      brightness: int
+    then:
+      - lambda: |-
+          id(flash_screen).stop();
+          id(oled).set_contrast(1.0f);
+          static const uint8_t BAYER_4X4[16] = {
+              0, 8, 2, 10,
+              12, 4, 14, 6,
+              3, 11, 1, 9,
+              15, 7, 13, 5,
+          };
+          static const uint16_t HEX_GLYPHS[16] = {
+              0b111101101101111,
+              0b010110010010111,
+              0b111001111100111,
+              0b111001111001111,
+              0b101101111001001,
+              0b111100111001111,
+              0b111100111101111,
+              0b111001001001001,
+              0b111101111101111,
+              0b111101111001111,
+              0b111101111101101,
+              0b110101110101110,
+              0b111100100100111,
+              0b110101101101110,
+              0b111100110100111,
+              0b111100110100100,
+          };
+
+          const uint8_t maximum = std::max(red, std::max(green, blue));
+          const uint8_t grey = (maximum * brightness + 127) / 255;
+          char hex[7];
+          snprintf(hex, sizeof(hex), "%02X%02X%02X", red, green, blue);
+
+          ESP_LOGI(
+              "rearview_ble",
+              "Rendering OLED: hex=%s, grey=%u (max=%u, brightness=%u)",
+              hex,
+              grey,
+              maximum,
+              brightness);
+
+          id(oled).turn_on();
+          id(oled).fill(Color(0, 0, 0));
+          for (uint8_t y = 0; y < 20; y++) {
+            for (uint8_t x = 0; x < 72; x++) {
+              const uint8_t threshold = BAYER_4X4[(y % 4) * 4 + (x % 4)] * 16;
+              if (grey > threshold) {
+                id(oled).draw_pixel_at(x, y, Color(255, 255, 255));
+              }
+            }
+          }
+
+          for (uint8_t digit = 0; digit < 6; digit++) {
+            const char character = hex[digit];
+            const uint8_t index = character <= '9' ? character - '0' : character - 'A' + 10;
+            const uint16_t glyph = HEX_GLYPHS[index];
+            for (uint8_t row = 0; row < 5; row++) {
+              for (uint8_t column = 0; column < 3; column++) {
+                const uint8_t bit = 14 - (row * 3 + column);
+                if ((glyph & (1U << bit)) != 0) {
+                  id(oled).filled_rectangle(
+                      4 + digit * 11 + column * 3,
+                      22 + row * 3,
+                      3,
+                      3,
+                      Color(255, 255, 255));
+                }
+              }
+            }
+          }
+          id(oled).update();
+
+  - id: render_text_command
+    mode: restart
+    parameters:
+      text: string
+    then:
+      - lambda: |-
+          id(flash_screen).stop();
+          id(oled).set_contrast(1.0f);
+          id(oled).turn_on();
+          id(oled).fill(Color(0, 0, 0));
+
+          std::string line;
+          int y = 0;
+          for (size_t offset = 0; offset < text.size() && y < 40;) {
+            const uint8_t lead = static_cast<uint8_t>(text[offset]);
+            size_t character_length = 1;
+            if ((lead & 0xF8) == 0xF0) {
+              character_length = 4;
+            } else if ((lead & 0xF0) == 0xE0) {
+              character_length = 3;
+            } else if ((lead & 0xE0) == 0xC0) {
+              character_length = 2;
+            }
+            character_length = std::min(character_length, text.size() - offset);
+            const std::string character = text.substr(offset, character_length);
+            offset += character_length;
+
+            if (character == "\n") {
+              id(oled).print(0, y, id(text_font), Color(255, 255, 255), line.c_str());
+              line.clear();
+              y += 10;
+              continue;
+            }
+
+            const std::string candidate = line + character;
+            int x1;
+            int y1;
+            int width;
+            int height;
+            id(oled).get_text_bounds(
+                0,
+                0,
+                candidate.c_str(),
+                id(text_font),
+                TextAlign::TOP_LEFT,
+                &x1,
+                &y1,
+                &width,
+                &height);
+            if (width > 72 && !line.empty()) {
+              id(oled).print(0, y, id(text_font), Color(255, 255, 255), line.c_str());
+              line = character;
+              y += 10;
+            } else {
+              line = candidate;
+            }
+          }
+          if (!line.empty() && y < 40) {
+            id(oled).print(0, y, id(text_font), Color(255, 255, 255), line.c_str());
+          }
+          id(oled).update();
+
+  - id: flash_screen
+    mode: restart
+    parameters:
+      duration_ms: int
+      intensity: int
+    then:
+      - lambda: |-
+          ESP_LOGI(
+              "rearview_ble",
+              "Starting repeating flash: phase=%u ms, intensity=%u",
+              duration_ms,
+              intensity);
+          id(oled).set_contrast(intensity / 255.0f);
+      - while:
+          condition:
+            lambda: return true;
+          then:
+            - lambda: |-
+                id(oled).turn_on();
+                id(oled).fill(Color(255, 255, 255));
+                id(oled).update();
+            - delay: !lambda return duration_ms;
+            - lambda: |-
+                id(oled).fill(Color(0, 0, 0));
+                id(oled).update();
+                id(oled).turn_off();
+            - delay: !lambda return duration_ms;
 
 esp32_ble:
   name: Rearview Light
@@ -70,8 +253,14 @@ esp32_ble:
 i2c:
   sda: GPIO5
   scl: GPIO6
+  frequency: 100kHz
   scan: true
   id: oled_bus
+
+font:
+  - file: "gfonts://Roboto Mono"
+    id: text_font
+    size: 9
 
 display:
   - platform: ssd1306_i2c
@@ -88,6 +277,8 @@ esp32_ble_server:
   on_pairing_passkey:
     then:
       - lambda: |-
+          id(flash_screen).stop();
+          id(oled).set_contrast(1.0f);
           static const uint16_t DIGITS[10] = {
               0b111101101101111,
               0b010110010010111,
@@ -120,25 +311,24 @@ esp32_ble_server:
   on_pairing_complete:
     then:
       - lambda: |-
-          if (!id(has_rgb_command)) {
+          if (id(display_mode) == 0) {
             id(oled).fill(Color(0, 0, 0));
             id(oled).update();
             id(oled).turn_off();
             return;
           }
 
-          const uint32_t command = id(last_rgb_command);
-          auto colour = Color(
-              (command >> 24) & 0xFF,
-              (command >> 16) & 0xFF,
-              (command >> 8) & 0xFF) * (command & 0xFF);
-          if (colour.is_on()) {
-            id(oled).turn_on();
-          }
-          id(oled).fill(colour);
-          id(oled).update();
-          if (!colour.is_on()) {
-            id(oled).turn_off();
+          if (id(display_mode) == 1) {
+            const uint32_t command = id(last_rgb_command);
+            id(render_rgb_command).execute(
+                (command >> 24) & 0xFF,
+                (command >> 16) & 0xFF,
+                (command >> 8) & 0xFF,
+                command & 0xFF);
+          } else if (id(display_mode) == 2) {
+            id(render_text_command).execute(id(last_text));
+          } else if (id(display_mode) == 3) {
+            id(flash_screen).execute(id(last_flash_duration), id(last_flash_intensity));
           }
   services:
     - uuid: 898a0c20-6d38-4a49-9f84-f942b4cd9380
@@ -146,30 +336,112 @@ esp32_ble_server:
       characteristics:
         - id: colour_characteristic
           uuid: 898a0c21-6d38-4a49-9f84-f942b4cd9380
-          description: RGB colour and brightness
+          description: Indicator command
           write: true
           on_write:
             then:
               - lambda: |-
-                  if (x.size() != 4) {
-                    ESP_LOGW("rearview_ble", "Expected 4 colour bytes, received %u", x.size());
+                  ESP_LOGI(
+                      "rearview_ble",
+                      "Indicator command write: connection=%u, length=%u",
+                      id,
+                      static_cast<unsigned int>(x.size()));
+                  if (x.empty()) {
+                    ESP_LOGW(
+                        "rearview_ble",
+                        "Rejected empty indicator command");
                     return;
                   }
 
-                  id(last_rgb_command) =
-                      (static_cast<uint32_t>(x[0]) << 24) |
-                      (static_cast<uint32_t>(x[1]) << 16) |
-                      (static_cast<uint32_t>(x[2]) << 8) |
-                      x[3];
-                  id(has_rgb_command) = true;
-                  auto colour = Color(x[0], x[1], x[2]) * x[3];
-                  if (!colour.is_on()) {
-                    id(oled).fill(colour);
-                    id(oled).update();
-                    id(oled).turn_off();
-                    return;
+                  switch (x[0]) {
+                    case 0x01: {
+                      if (x.size() != 5) {
+                        ESP_LOGW(
+                            "rearview_ble",
+                            "Rejected RGB command: expected 5 bytes, received %u",
+                            static_cast<unsigned int>(x.size()));
+                        return;
+                      }
+                      ESP_LOGI(
+                          "rearview_ble",
+                          "RGB command: red=%u, green=%u, blue=%u, brightness=%u",
+                          x[1],
+                          x[2],
+                          x[3],
+                          x[4]);
+                      id(last_rgb_command) =
+                          (static_cast<uint32_t>(x[1]) << 24) |
+                          (static_cast<uint32_t>(x[2]) << 16) |
+                          (static_cast<uint32_t>(x[3]) << 8) |
+                          x[4];
+                      id(display_mode) = 1;
+                      id(render_rgb_command).execute(x[1], x[2], x[3], x[4]);
+                      return;
+                    }
+                    case 0x02: {
+                      if (x.size() < 2 || x.size() > 121) {
+                        ESP_LOGW(
+                            "rearview_ble",
+                            "Rejected text command: payload must be 1-120 bytes, received %u",
+                            static_cast<unsigned int>(x.size() - 1));
+                        return;
+                      }
+                      const std::string text(x.begin() + 1, x.end());
+                      ESP_LOGI(
+                          "rearview_ble",
+                          "Text command (%u bytes): %s",
+                          static_cast<unsigned int>(text.size()),
+                          text.c_str());
+                      id(last_text) = text;
+                      id(display_mode) = 2;
+                      id(render_text_command).execute(text);
+                      return;
+                    }
+                    case 0x03: {
+                      if (x.size() != 4) {
+                        ESP_LOGW(
+                            "rearview_ble",
+                            "Rejected flash command: expected 4 bytes, received %u",
+                            static_cast<unsigned int>(x.size()));
+                        return;
+                      }
+                      const uint16_t duration_ms = x[1] | (static_cast<uint16_t>(x[2]) << 8);
+                      if (duration_ms == 0 || duration_ms > 60000) {
+                        ESP_LOGW(
+                            "rearview_ble",
+                            "Rejected flash phase duration: %u ms",
+                            duration_ms);
+                        return;
+                      }
+                      ESP_LOGI(
+                          "rearview_ble",
+                          "Flash command: phase=%u ms, intensity=%u",
+                          duration_ms,
+                          x[3]);
+                      id(last_flash_duration) = duration_ms;
+                      id(last_flash_intensity) = x[3];
+                      id(display_mode) = 3;
+                      id(flash_screen).execute(duration_ms, x[3]);
+                      return;
+                    }
+                    case 0x04: {
+                      if (x.size() != 1) {
+                        ESP_LOGW(
+                            "rearview_ble",
+                            "Rejected clear command: expected 1 byte, received %u",
+                            static_cast<unsigned int>(x.size()));
+                        return;
+                      }
+                      ESP_LOGI("rearview_ble", "Clear command");
+                      id(flash_screen).stop();
+                      id(oled).set_contrast(1.0f);
+                      id(oled).fill(Color(0, 0, 0));
+                      id(oled).update();
+                      id(oled).turn_off();
+                      id(display_mode) = 0;
+                      return;
+                    }
+                    default:
+                      ESP_LOGW("rearview_ble", "Rejected unknown indicator opcode: 0x%02X", x[0]);
+                      return;
                   }
-
-                  id(oled).turn_on();
-                  id(oled).fill(colour);
-                  id(oled).update();

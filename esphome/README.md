@@ -1,8 +1,8 @@
 # Rearview indicator firmware
 
 This directory contains ESPHome firmware for a small BLE-controlled indicator.
-It runs on an ESP32-C3, accepts a four-byte colour command over a custom GATT
-service, and maps that command to a 72 x 40 SSD1306 OLED.
+It runs on an ESP32-C3, accepts typed RGB, text, and flash commands over a custom
+GATT service, and maps those commands to a 72 x 40 SSD1306 OLED.
 
 The Rearview app implements the client in `bluetoothRgb.ts` and exposes it on the
 Tools screen. It scans for the advertised service and device name, connects,
@@ -24,6 +24,9 @@ The display is an SSD1306-compatible 72 x 40 monochrome OLED at I2C address
 Connect ground between the board and display, and power the display according
 to the voltage requirements of the specific module. The firmware scans the I2C
 bus during startup, which makes the detected address visible in serial logs.
+The bus runs at standard-mode 100 kHz so a complete OLED framebuffer write stays
+below ESPHome's fixed 50 ms script blocking-warning threshold; the previous
+50 kHz default took about 76 ms per update.
 
 ## Firmware structure
 
@@ -37,11 +40,11 @@ bus during startup, which makes the detected address visible in serial logs.
 - `i2c` and `ssd1306_i2c` drive the display without a periodic refresh; and
 - the characteristic's `on_write` lambda validates and applies each command.
 
-The OLED is turned off after boot. A valid non-zero command turns it on and
-fills the framebuffer; an effective zero colour clears it and turns it off.
-Because this display is monochrome, the current output is an all-on or all-off
-panel. The RGB and brightness fields remain in the protocol, but the firmware
-does not render distinct colours or brightness levels on this hardware.
+The OLED is turned off after boot. After a valid command, its top half shows a
+dithered greyscale preview calculated as `max(red, green, blue) * brightness /
+255`, and its bottom half shows the requested RGB bytes as six hexadecimal
+digits. Because the SSD1306 is physically one-bit, the preview uses a 4 x 4
+ordered-dither pattern rather than true greyscale pixels.
 
 There is no Wi-Fi, ESPHome native API, web server, or OTA configuration. Runtime
 access is BLE, with serial logging available during development.
@@ -62,6 +65,14 @@ actual device:
 
 ```sh
 uvx --from esphome==2026.7.4 esphome run rearview-indicator.yaml \
+  --device /dev/cu.usbmodem-example
+```
+
+To watch the INFO-level BLE and RGB diagnostics without rebuilding, keep the
+board connected over USB and run:
+
+```sh
+uvx --from esphome==2026.7.4 esphome logs rearview-indicator.yaml \
   --device /dev/cu.usbmodem-example
 ```
 
@@ -88,55 +99,68 @@ bonding. Treat the passkey as device access control, not as a secret unique to a
 installation. When the ESP-IDF Bluetooth stack requests passkey display, the
 firmware shows the actual six-digit value across the OLED and logs it as
 `BLE pairing passkey: 123456` through the ESPHome logger. Once authentication
-finishes, the OLED returns to the most recent RGB command, or turns off if no
-command has been received.
+finishes, the OLED returns to the most recent RGB or text command, or turns off
+if no persistent command has been received.
 
 ### GATT service
 
 | Item                       | UUID                                   | Properties |
 | -------------------------- | -------------------------------------- | ---------- |
 | Rearview indicator service | `898a0c20-6d38-4a49-9f84-f942b4cd9380` | Advertised |
-| Colour characteristic      | `898a0c21-6d38-4a49-9f84-f942b4cd9380` | Write      |
+| Command characteristic     | `898a0c21-6d38-4a49-9f84-f942b4cd9380` | Write      |
 
-The colour characteristic also exposes the standard Characteristic User
-Description descriptor (`0x2901`) with the text `RGB colour and brightness`.
+The command characteristic also exposes the standard Characteristic User
+Description descriptor (`0x2901`) with the text `Indicator command`.
 The local BLE component adds the standard Device Information service (`0x180A`)
 with readable manufacturer (`Rearview`), model (`RGB Indicator`), and ESPHome
 firmware-version characteristics.
 
-### Colour command
+### Command protocol
 
-Write exactly four bytes to the colour characteristic:
+Every write starts with a one-byte opcode:
 
-| Offset | Name       | Range | Meaning                             |
-| ------ | ---------- | ----- | ----------------------------------- |
-| 0      | Red        | 0-255 | Red channel intensity               |
-| 1      | Green      | 0-255 | Green channel intensity             |
-| 2      | Blue       | 0-255 | Blue channel intensity              |
-| 3      | Brightness | 0-255 | Scale applied to all three channels |
+| Opcode | Command | Remaining payload                                |
+| ------ | ------- | ------------------------------------------------ |
+| `01`   | RGB     | Red, green, blue, brightness                     |
+| `02`   | Text    | 1-120 bytes of UTF-8 text                        |
+| `03`   | Flash   | Duration low byte, duration high byte, intensity |
+| `04`   | Clear   | No remaining payload                             |
 
-The payload has no header, length field, version, checksum, or byte-order
-concern: each field is a single unsigned byte. For example, the byte sequence
-`ff 00 00 80` requests red at approximately half brightness. On the current
-monochrome OLED this produces a filled, on display rather than visible red.
+An RGB command is exactly five bytes. For example, `01 ff 00 00 80` requests red
+at approximately half brightness. The top half of the monochrome OLED shows the
+result as ordered-dithered intensity, while the bottom half shows `FF0000`.
 
-An effective colour of zero turns the display off. That includes `00 00 00 xx`,
-`xx xx xx 00`, and any values whose scaled channels all become zero. Other valid
-commands turn the display on and fill it.
+A text command is the `02` opcode followed by UTF-8 text. The firmware measures
+and wraps characters across up to four lines using the bundled 9-pixel font.
+Glyphs outside the configured font set cannot be rendered even though the
+transport remains UTF-8.
 
-Writes of any length other than four bytes are ignored and logged as a warning.
+A flash command is exactly four bytes. Duration is an unsigned 16-bit
+little-endian phase length from 1 to 60000 ms, and intensity is 0-255. For
+example, `03 e8 03 80` repeatedly displays a full white framebuffer at half
+contrast for 1000 ms, then turns it off for 1000 ms. Flashing continues until a
+new RGB, text, flash, or clear command replaces it.
+
+A clear command is the single byte `04`. It cancels active flashing, clears the
+framebuffer, resets display contrast, and turns the OLED off.
+
+Unknown opcodes, invalid lengths, empty text, and invalid flash phases are
+ignored and logged as warnings. At INFO level, the serial console logs BLE
+connections and disconnections, security requests, passkey notifications, GATT
+write metadata, decoded command fields, and display actions. These events
+distinguish a completed iPhone-side write from a write that actually reached the
+firmware.
 There is no application-level acknowledgement, readable current-state
 characteristic, notification, or indication. The client should treat a
-successful GATT write as transport completion only. A disconnect does not clear
-the last displayed state; rebooting does, because the boot automation turns the
-OLED off.
+successful GATT write as transport completion only. A disconnect does not alter
+the active display or flash timer; rebooting turns the OLED off.
 
 ### Client sequence
 
 1. Scan for `Rearview Light` or the advertised service UUID.
 2. Connect and pair with passkey `123456` if the operating system requests it.
 3. Discover service `898a0c20-6d38-4a49-9f84-f942b4cd9380`.
-4. Write a four-byte value to characteristic
+4. Write an opcode-prefixed command to characteristic
    `898a0c21-6d38-4a49-9f84-f942b4cd9380`.
-5. Keep the connection or disconnect; the indicator retains the last command
-   until another valid write or a reboot.
+5. Keep the connection or disconnect. RGB and text remain displayed, and flash
+   keeps repeating, until another command or reboot.

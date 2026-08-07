@@ -234,6 +234,9 @@ void BLECharacteristic::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt
       if (this->handle_ != param->write.handle)
         break;
 
+      ESP_LOGI(TAG, "GATT write received: connection=%u, handle=%u, length=%u, response=%s, prepared=%s",
+               param->write.conn_id, param->write.handle, param->write.len, YESNO(param->write.need_rsp),
+               YESNO(param->write.is_prep));
       esp_gatt_status_t status = ESP_GATT_OK;
 
       if (param->write.is_prep) {

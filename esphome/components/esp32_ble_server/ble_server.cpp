@@ -167,8 +167,8 @@ void BLEServer::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t ga
                                     esp_ble_gatts_cb_param_t *param) {
   switch (event) {
     case ESP_GATTS_CONNECT_EVT: {
-      ESP_LOGD(TAG, "BLE Client connected");
       this->add_client_(param->connect.conn_id);
+      ESP_LOGI(TAG, "BLE client connected: connection=%u, clients=%u", param->connect.conn_id, this->client_count_);
       // Resume advertising so additional clients can discover and connect
       if (this->client_count_ < this->max_clients_) {
         this->parent_->advertising_start();
@@ -177,7 +177,8 @@ void BLEServer::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t ga
       break;
     }
     case ESP_GATTS_DISCONNECT_EVT: {
-      ESP_LOGD(TAG, "BLE Client disconnected");
+      ESP_LOGI(TAG, "BLE client disconnected: connection=%u, reason=0x%02X", param->disconnect.conn_id,
+               param->disconnect.reason);
       this->remove_client_(param->disconnect.conn_id);
       this->parent_->advertising_start();
       this->dispatch_callbacks_(CallbackType::ON_DISCONNECT, param->disconnect.conn_id);
@@ -200,6 +201,7 @@ void BLEServer::gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t ga
 void BLEServer::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
   switch (event) {
     case ESP_GAP_BLE_SEC_REQ_EVT: {
+      ESP_LOGI(TAG, "BLE client requested a secure connection");
       const esp_err_t err = esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
       if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to accept BLE security request: %d", err);

@@ -30,6 +30,18 @@ and log that event's six-digit value, then restore the previous OLED state when
 authentication completes. Do not infer the displayed code from the configured
 static passkey.
 
+Keep the OLED I2C bus at 100 kHz or faster. ESPHome 2026.7.4 hard-codes a 50 ms
+blocking warning for scripts, and the 50 kHz default makes a full framebuffer
+write exceed it; there is no supported per-script YAML threshold override.
+
+The Tools BLE status comes from the sender's live connection-state subscription,
+including the native disconnection callback. A successful GATT write is not a
+substitute for connection state. Firmware BLE diagnostics must remain visible at
+INFO level and include connection IDs and decoded command fields. The command
+characteristic uses typed opcodes: `01` RGB, `02` UTF-8 text, and `03` repeating
+flash with little-endian phase milliseconds and one-byte intensity; `04` clears
+and powers off the display.
+
 After changing iOS-native dependencies, run `pod install --project-directory=ios`.
 Keep the React Native source-build overrides in `ios/Podfile`: the React Native
 0.86.2 prebuilt framework does not export C++ symbols required by generated

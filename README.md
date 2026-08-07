@@ -75,7 +75,8 @@ simulator Metal driver cannot load the bundled vision projector safely; physical
 devices continue to use Metal acceleration.
 
 The simulator can display and exercise the Tools UI, but it cannot discover or
-write to the companion BLE indicator. Test **Send RGB** on a physical iPhone.
+write to the companion BLE indicator. Test its RGB, text, repeating flash, and
+clear commands on a physical iPhone.
 
 Camera analysis requires a device or simulator with an available rear camera.
 Photo-library analysis can still be used independently.
@@ -105,11 +106,13 @@ predicted tokens to keep the monitoring loop responsive on a phone.
 
 ## Companion indicator
 
-`esphome/` contains firmware for an ESP32-C3 and SSD1306 OLED that exposes a
-small BLE colour-and-brightness protocol. Open the app's Tools screen, adjust the
-four channel sliders, and tap **Send** to discover `Rearview Light` and write the
-command. BLE discovery and writes require a physical iPhone and do not work in
-the iOS simulator. The first connection may prompt for the indicator's BLE passkey. Its
+`esphome/` contains firmware for an ESP32-C3 and SSD1306 OLED that accepts RGB,
+wrapped text, repeating flash, and clear commands over BLE. The Tools screen
+provides a separate control for each command. The connection indicator reports
+Disconnected, Connecting, or Connected
+from the live CoreBluetooth device lifecycle. BLE discovery and writes require a
+physical iPhone and do not work in the iOS simulator. The first connection may
+prompt for the indicator's BLE passkey. Its
 hardware layout, build instructions, security settings, and wire protocol are
 documented in [`esphome/README.md`](esphome/README.md).
 
@@ -149,7 +152,7 @@ continuous capture.
 | `imageAnalysis.ts`      | Image resize, temporary-file cleanup, and inference handoff            |
 | `rearview.ts`           | Bundled model initialization, prompt storage, and multimodal inference |
 | `ToolsScreen.tsx`       | Companion-indicator controls and send status                           |
-| `bluetoothRgb.ts`       | BLE discovery, connection, payload encoding, and writes                |
+| `bluetoothRgb.ts`       | BLE lifecycle, typed command encoding, and indicator writes            |
 | `__tests__/`            | Jest unit and component tests                                          |
 | `models/`               | Downloaded GGUF model and projector files; ignored by Git              |
 | `scripts/`              | Model download and signed iOS device deployment                        |

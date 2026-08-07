@@ -6,12 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
 import {
-  BluetoothRgbSender,
-  RgbSendError,
+  BluetoothIndicatorClient,
+  IndicatorSendError,
+  type BluetoothConnectionState,
   type RgbValue,
 } from './bluetoothRgb';
 
@@ -27,19 +29,30 @@ const secondaryTextColor = DynamicColorIOS({
 const borderColor = DynamicColorIOS({ light: '#a1a1aa', dark: '#636366' });
 const accentColor = DynamicColorIOS({ light: '#0066cc', dark: '#64a8ff' });
 
-type ChannelKey = keyof RgbValue;
+const connectionPresentation: Record<
+  BluetoothConnectionState,
+  { colour: string; label: string }
+> = {
+  disconnected: { colour: '#ff453a', label: 'Disconnected' },
+  connecting: { colour: '#ff9f0a', label: 'Connecting' },
+  connected: { colour: '#30d158', label: 'Connected' },
+};
 
 type ChannelSliderProps = {
-  channel: ChannelKey;
   label: string;
-  onChange: (channel: ChannelKey, value: number) => void;
+  maximumValue?: number;
+  minimumValue?: number;
+  onChange: (value: number) => void;
+  step?: number;
   value: number;
 };
 
 function ChannelSlider({
-  channel,
   label,
+  maximumValue = 255,
+  minimumValue = 0,
   onChange,
+  step = 1,
   value,
 }: ChannelSliderProps): React.JSX.Element {
   return (
@@ -53,11 +66,11 @@ function ChannelSlider({
       <Slider
         accessibilityLabel={`${label} slider`}
         maximumTrackTintColor="#8e8e93"
-        maximumValue={255}
+        maximumValue={maximumValue}
+        minimumValue={minimumValue}
         minimumTrackTintColor="#0a84ff"
-        minimumValue={0}
-        onValueChange={nextValue => onChange(channel, Math.round(nextValue))}
-        step={1}
+        onValueChange={nextValue => onChange(Math.round(nextValue))}
+        step={step}
         thumbTintColor="#0a84ff"
         value={value}
       />
@@ -66,7 +79,7 @@ function ChannelSlider({
 }
 
 function sendErrorMessage(error: unknown): string {
-  if (error instanceof RgbSendError) {
+  if (error instanceof IndicatorSendError) {
     return error.message;
   }
 
@@ -74,29 +87,39 @@ function sendErrorMessage(error: unknown): string {
 }
 
 export default function ToolsScreen(): React.JSX.Element {
-  const senderRef = useRef<BluetoothRgbSender | null>(null);
+  const clientRef = useRef<BluetoothIndicatorClient | null>(null);
   const [value, setValue] = useState<RgbValue>({
     red: 255,
     green: 0,
     blue: 0,
     brightness: 255,
   });
-  const [sending, setSending] = useState(false);
+  const [text, setText] = useState('Rearview');
+  const [flashDuration, setFlashDuration] = useState(1000);
+  const [flashIntensity, setFlashIntensity] = useState(255);
+  const [sending, setSending] = useState<
+    'rgb' | 'text' | 'flash' | 'clear' | null
+  >(null);
   const [result, setResult] = useState<string | null>(null);
+  const [connectionState, setConnectionState] =
+    useState<BluetoothConnectionState>('disconnected');
 
-  if (senderRef.current === null) {
-    senderRef.current = new BluetoothRgbSender();
+  if (clientRef.current === null) {
+    clientRef.current = new BluetoothIndicatorClient();
   }
 
-  useEffect(
-    () => () => {
-      senderRef.current?.destroy();
-      senderRef.current = null;
-    },
-    [],
-  );
+  useEffect(() => {
+    const unsubscribe =
+      clientRef.current?.subscribeToConnectionState(setConnectionState);
 
-  function setChannel(channel: ChannelKey, channelValue: number): void {
+    return () => {
+      unsubscribe?.();
+      clientRef.current?.destroy();
+      clientRef.current = null;
+    };
+  }, []);
+
+  function setChannel(channel: keyof RgbValue, channelValue: number): void {
     setValue(currentValue => ({
       ...currentValue,
       [channel]: channelValue,
@@ -104,18 +127,62 @@ export default function ToolsScreen(): React.JSX.Element {
   }
 
   async function send(): Promise<void> {
-    setSending(true);
+    setSending('rgb');
     setResult(null);
 
     try {
-      await senderRef.current?.send(value);
+      await clientRef.current?.sendRgb(value);
       setResult(
         `Sent ${value.red}, ${value.green}, ${value.blue} at ${value.brightness} brightness`,
       );
     } catch (error) {
       setResult(`Error: ${sendErrorMessage(error)}`);
     } finally {
-      setSending(false);
+      setSending(null);
+    }
+  }
+
+  async function sendText(): Promise<void> {
+    setSending('text');
+    setResult(null);
+
+    try {
+      await clientRef.current?.sendText(text);
+      setResult(`Sent text: ${text}`);
+    } catch (error) {
+      setResult(`Error: ${sendErrorMessage(error)}`);
+    } finally {
+      setSending(null);
+    }
+  }
+
+  async function sendFlash(): Promise<void> {
+    setSending('flash');
+    setResult(null);
+
+    try {
+      await clientRef.current?.sendFlash(flashDuration, flashIntensity);
+      setResult(
+        `Started flash with ${flashDuration} ms phases at ${flashIntensity} intensity`,
+      );
+    } catch (error) {
+      setResult(`Error: ${sendErrorMessage(error)}`);
+    } finally {
+      setSending(null);
+    }
+  }
+
+  async function sendClear(): Promise<void> {
+    setSending('clear');
+    setResult(null);
+
+    try {
+      await clientRef.current?.sendClear();
+      setResult('Cleared indicator');
+    } catch (error) {
+      setResult(`Error: ${sendErrorMessage(error)}`);
+    } finally {
+      setSending(null);
     }
   }
 
@@ -124,10 +191,28 @@ export default function ToolsScreen(): React.JSX.Element {
   const expectedGreen = Math.round(value.green * brightnessScale);
   const expectedBlue = Math.round(value.blue * brightnessScale);
   const expectedColour = `rgb(${expectedRed}, ${expectedGreen}, ${expectedBlue})`;
+  const connection = connectionPresentation[connectionState];
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Tools</Text>
+      <View style={styles.pageHeadingRow}>
+        <Text style={styles.title}>Tools</Text>
+        <View style={styles.connectionStatus}>
+          <View
+            accessibilityElementsHidden
+            style={[
+              styles.connectionIndicator,
+              { backgroundColor: connection.colour },
+            ]}
+          />
+          <Text
+            accessibilityLabel={`Bluetooth status: ${connection.label}`}
+            style={styles.connectionLabel}
+          >
+            {connection.label}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.toolCard}>
         <View style={styles.toolHeadingRow}>
@@ -139,43 +224,93 @@ export default function ToolsScreen(): React.JSX.Element {
         </View>
 
         <ChannelSlider
-          channel="red"
           label="Red"
-          onChange={setChannel}
+          onChange={channelValue => setChannel('red', channelValue)}
           value={value.red}
         />
         <ChannelSlider
-          channel="green"
           label="Green"
-          onChange={setChannel}
+          onChange={channelValue => setChannel('green', channelValue)}
           value={value.green}
         />
         <ChannelSlider
-          channel="blue"
           label="Blue"
-          onChange={setChannel}
+          onChange={channelValue => setChannel('blue', channelValue)}
           value={value.blue}
         />
         <ChannelSlider
-          channel="brightness"
           label="Brightness"
-          onChange={setChannel}
+          onChange={channelValue => setChannel('brightness', channelValue)}
           value={value.brightness}
         />
 
         <Button
           color={accentColor}
-          disabled={sending}
+          disabled={sending !== null}
           onPress={send}
-          title={sending ? 'Sending…' : 'Send'}
+          title={sending === 'rgb' ? 'Sending…' : 'Send RGB'}
         />
-
-        {result !== null && (
-          <Text accessibilityLiveRegion="polite" style={styles.resultText}>
-            {result}
-          </Text>
-        )}
       </View>
+
+      <View style={styles.toolCard}>
+        <Text style={styles.toolTitle}>Send text</Text>
+        <TextInput
+          accessibilityLabel="Indicator text"
+          autoCapitalize="sentences"
+          maxLength={120}
+          multiline
+          onChangeText={setText}
+          placeholder="Text to display"
+          placeholderTextColor={secondaryTextColor}
+          style={styles.textInput}
+          value={text}
+        />
+        <Button
+          color={accentColor}
+          disabled={sending !== null || text.length === 0}
+          onPress={sendText}
+          title={sending === 'text' ? 'Sending…' : 'Send text'}
+        />
+      </View>
+
+      <View style={styles.toolCard}>
+        <Text style={styles.toolTitle}>Flash</Text>
+        <ChannelSlider
+          label="Duration (ms)"
+          maximumValue={10000}
+          minimumValue={100}
+          onChange={setFlashDuration}
+          step={100}
+          value={flashDuration}
+        />
+        <ChannelSlider
+          label="Intensity"
+          onChange={setFlashIntensity}
+          value={flashIntensity}
+        />
+        <Button
+          color={accentColor}
+          disabled={sending !== null}
+          onPress={sendFlash}
+          title={sending === 'flash' ? 'Sending…' : 'Flash'}
+        />
+      </View>
+
+      <View style={styles.toolCard}>
+        <Text style={styles.toolTitle}>Clear screen</Text>
+        <Button
+          color={accentColor}
+          disabled={sending !== null}
+          onPress={sendClear}
+          title={sending === 'clear' ? 'Clearing…' : 'Clear'}
+        />
+      </View>
+
+      {result !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.resultText}>
+          {result}
+        </Text>
+      )}
     </ScrollView>
   );
 }
@@ -190,6 +325,11 @@ const styles = StyleSheet.create({
     color: primaryTextColor,
     fontSize: 32,
     fontWeight: '700',
+  },
+  pageHeadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   toolCard: {
     backgroundColor: cardBackgroundColor,
@@ -208,6 +348,32 @@ const styles = StyleSheet.create({
     color: primaryTextColor,
     fontSize: 22,
     fontWeight: '700',
+  },
+  connectionStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  connectionIndicator: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  connectionLabel: {
+    color: secondaryTextColor,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  textInput: {
+    backgroundColor: cardBackgroundColor,
+    borderColor,
+    borderRadius: 8,
+    borderWidth: 1,
+    color: primaryTextColor,
+    fontSize: 17,
+    minHeight: 72,
+    padding: 12,
+    textAlignVertical: 'top',
   },
   colourPreview: {
     borderColor,
