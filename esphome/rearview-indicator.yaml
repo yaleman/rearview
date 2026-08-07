@@ -1,6 +1,11 @@
 esphome:
   name: rearview-indicator
   friendly_name: Rearview Indicator
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          id(oled).turn_off();
   on_loop:
     then:
       - lambda: |-
@@ -52,15 +57,19 @@ esp32_ble:
   max_key_size: 16
   max_connections: 1
 
-light:
-  - platform: esp32_rmt_led_strip
-    id: indicator_light
-    name: Indicator Light
-    pin: GPIO8
-    num_leds: 1
-    chipset: WS2812
-    rgb_order: GRB
-    restore_mode: ALWAYS_OFF
+i2c:
+  sda: GPIO5
+  scl: GPIO6
+  scan: true
+  id: oled_bus
+
+display:
+  - platform: ssd1306_i2c
+    id: oled
+    i2c_id: oled_bus
+    model: "SSD1306 72x40"
+    address: 0x3C
+    update_interval: never
 
 esp32_ble_server:
   manufacturer: Rearview
@@ -82,15 +91,14 @@ esp32_ble_server:
                     return;
                   }
 
-                  if ((x[0] == 0 && x[1] == 0 && x[2] == 0) || x[3] == 0) {
-                    id(indicator_light).turn_off().perform();
+                  auto colour = Color(x[0], x[1], x[2]) * x[3];
+                  if (!colour.is_on()) {
+                    id(oled).fill(colour);
+                    id(oled).update();
+                    id(oled).turn_off();
                     return;
                   }
 
-                  auto call = id(indicator_light).turn_on();
-                  call.set_rgb(
-                      static_cast<float>(x[0]) / 255.0f,
-                      static_cast<float>(x[1]) / 255.0f,
-                      static_cast<float>(x[2]) / 255.0f);
-                  call.set_brightness(static_cast<float>(x[3]) / 255.0f);
-                  call.perform();
+                  id(oled).turn_on();
+                  id(oled).fill(colour);
+                  id(oled).update();
