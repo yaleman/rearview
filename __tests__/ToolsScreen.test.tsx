@@ -5,6 +5,7 @@ const mockSendRgb = jest.fn<Promise<void>, [unknown]>();
 const mockSendText = jest.fn<Promise<void>, [string]>();
 const mockSendFlash = jest.fn<Promise<void>, [number, number]>();
 const mockSendClear = jest.fn<Promise<void>, []>();
+const mockConnect = jest.fn<Promise<void>, []>();
 const mockDestroy = jest.fn();
 const mockUnsubscribe = jest.fn();
 let connectionStateListener: ((state: string) => void) | null = null;
@@ -26,6 +27,7 @@ jest.mock('@react-native-community/slider', () => {
 
 jest.mock('../bluetoothRgb', () => ({
   BluetoothIndicatorClient: jest.fn().mockImplementation(() => ({
+    connect: mockConnect,
     destroy: mockDestroy,
     sendClear: mockSendClear,
     sendFlash: mockSendFlash,
@@ -41,6 +43,7 @@ import ToolsScreen from '../ToolsScreen';
 beforeEach(() => {
   jest.clearAllMocks();
   connectionStateListener = null;
+  mockConnect.mockResolvedValue();
   mockSendRgb.mockResolvedValue();
   mockSendText.mockResolvedValue();
   mockSendFlash.mockResolvedValue();
@@ -176,6 +179,25 @@ test('shows Bluetooth connection changes', () => {
       accessibilityLabel: 'Bluetooth status: Connected',
     }),
   ).toBeDefined();
+});
+
+test('connects when the disconnected status button is pressed', async () => {
+  const renderer = renderTools();
+  const disconnectedButton = renderer.root.findByProps({
+    accessibilityLabel: 'Bluetooth status: Disconnected',
+  });
+
+  expect(disconnectedButton.props.disabled).toBe(false);
+  await act(async () => disconnectedButton.props.onPress());
+  expect(mockConnect).toHaveBeenCalledTimes(1);
+
+  act(() => connectionStateListener?.('connected'));
+
+  expect(
+    renderer.root.findByProps({
+      accessibilityLabel: 'Bluetooth status: Connected',
+    }).props.disabled,
+  ).toBe(true);
 });
 
 test('destroys the Bluetooth sender when the tools screen closes', () => {

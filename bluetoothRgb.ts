@@ -209,14 +209,29 @@ export class BluetoothIndicatorClient {
     await this.write(encodeClearPayload());
   }
 
-  private async write(payload: string): Promise<void> {
+  async connect(): Promise<void> {
+    if (this.connectionState !== 'connected') {
+      this.setConnectionState('connecting');
+    }
+
     try {
       await this.waitForBluetooth();
+      await this.connectedDevice();
     } catch (error) {
       this.setConnectionState('disconnected');
       throw error;
     }
-    const device = await this.connectedDevice();
+  }
+
+  private async write(payload: string): Promise<void> {
+    await this.connect();
+    const device = this.device;
+    if (device === null) {
+      throw new IndicatorSendError(
+        IndicatorSendErrorKind.ConnectionFailed,
+        'Rearview Light disconnected before the command could be written',
+      );
+    }
 
     try {
       await device.writeCharacteristicWithResponseForService(

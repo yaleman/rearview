@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its local BLE server component is under `esphome/components/`, and its hardware and protocol contract are documented in `esphome/README.md`. Printable companion-hardware designs live in `hardware/`; keep source OpenSCAD files parameterized and do not commit generated STL files.
+`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its local BLE server component is under `esphome/components/`, and its hardware and protocol contract are documented in `esphome/README.md`. Printable companion-hardware designs live in `hardware/`; keep source OpenSCAD files parameterized and do not commit generated STL files. The ESP32-C3 tray has 3 mm front-wall returns around its centred USB opening.
 
 Always update the README.md and AGENTS.md when there's something people or robots need to know.
 
@@ -36,11 +36,13 @@ write exceed it; there is no supported per-script YAML threshold override.
 
 The Tools BLE status comes from the sender's live connection-state subscription,
 including the native disconnection callback. A successful GATT write is not a
-substitute for connection state. Firmware BLE diagnostics must remain visible at
-INFO level and include connection IDs and decoded command fields. The command
-characteristic uses typed opcodes: `01` RGB, `02` UTF-8 text, and `03` repeating
-flash with little-endian phase milliseconds and one-byte intensity; `04` clears
-and powers off the display.
+substitute for connection state. The Disconnected status is an enabled button
+that starts Bluetooth readiness, scanning, connection, and service discovery;
+Connecting and Connected are disabled button states. Firmware BLE diagnostics
+must remain visible at INFO level and include connection IDs and decoded command
+fields. The command characteristic uses typed opcodes: `01` RGB, `02` UTF-8 text,
+and `03` repeating flash with little-endian phase milliseconds and one-byte
+intensity; `04` clears and powers off the display.
 
 After changing iOS-native dependencies, run `pod install --project-directory=ios`.
 Keep the React Native source-build overrides in `ios/Podfile`: the React Native

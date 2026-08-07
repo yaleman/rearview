@@ -38,3 +38,8 @@ run = "./scripts/device.sh deploy"
 [tasks.esp]
 dir = "esphome"
 run = ["uvx esphome run rearview-indicator.yaml"]
+
+
+[tasks.both]
+depends = ["device"]
+run = "mise run esp"

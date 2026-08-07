@@ -108,9 +108,10 @@ predicted tokens to keep the monitoring loop responsive on a phone.
 
 `esphome/` contains firmware for an ESP32-C3 and SSD1306 OLED that accepts RGB,
 wrapped text, repeating flash, and clear commands over BLE. The Tools screen
-provides a separate control for each command. The connection indicator reports
-Disconnected, Connecting, or Connected
-from the live CoreBluetooth device lifecycle. BLE discovery and writes require a
+provides a separate control for each command. Its Bluetooth status is a button:
+Disconnected is enabled and starts Bluetooth readiness, scanning, connection,
+and service discovery; Connecting and Connected are disabled states driven by
+the live CoreBluetooth device lifecycle. BLE discovery and writes require a
 physical iPhone and do not work in the iOS simulator. The first connection may
 prompt for the indicator's BLE passkey. Its
 hardware layout, build instructions, security settings, and wire protocol are
@@ -118,10 +119,11 @@ documented in [`esphome/README.md`](esphome/README.md).
 
 ### ESP32-C3 case
 
-`hardware/esp32-c3-case.scad` is a printable open tray for the 20 x 25 mm
-ESP32-C3 board. It has a 2 mm base, three 2 mm walls, and an open USB end. The
-model allows 0.3 mm clearance around the board and defaults to walls 6 mm above
-the base; both values are parameters at the top of the OpenSCAD file.
+`hardware/esp32-c3-case.scad` is a printable tray for the 20 x 25 mm ESP32-C3
+board. It has a 2 mm base and 2 mm walls. The USB end wraps 3 mm inward on each
+side, leaving a centred 14.6 mm opening. The model allows 0.3 mm clearance around
+the board and defaults to walls 6 mm above the base; these values are parameters
+at the top of the OpenSCAD file.
 
 Export the printable STL with OpenSCAD:
 

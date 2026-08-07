@@ -29,13 +29,10 @@ const secondaryTextColor = DynamicColorIOS({
 const borderColor = DynamicColorIOS({ light: '#a1a1aa', dark: '#636366' });
 const accentColor = DynamicColorIOS({ light: '#0066cc', dark: '#64a8ff' });
 
-const connectionPresentation: Record<
-  BluetoothConnectionState,
-  { colour: string; label: string }
-> = {
-  disconnected: { colour: '#ff453a', label: 'Disconnected' },
-  connecting: { colour: '#ff9f0a', label: 'Connecting' },
-  connected: { colour: '#30d158', label: 'Connected' },
+const connectionPresentation: Record<BluetoothConnectionState, string> = {
+  disconnected: 'Disconnected',
+  connecting: 'Connecting…',
+  connected: 'Connected',
 };
 
 type ChannelSliderProps = {
@@ -126,6 +123,17 @@ export default function ToolsScreen(): React.JSX.Element {
     }));
   }
 
+  async function connect(): Promise<void> {
+    setResult(null);
+
+    try {
+      await clientRef.current?.connect();
+      setResult('Connected to Rearview Light');
+    } catch (error) {
+      setResult(`Error: ${sendErrorMessage(error)}`);
+    }
+  }
+
   async function send(): Promise<void> {
     setSending('rgb');
     setResult(null);
@@ -191,27 +199,19 @@ export default function ToolsScreen(): React.JSX.Element {
   const expectedGreen = Math.round(value.green * brightnessScale);
   const expectedBlue = Math.round(value.blue * brightnessScale);
   const expectedColour = `rgb(${expectedRed}, ${expectedGreen}, ${expectedBlue})`;
-  const connection = connectionPresentation[connectionState];
+  const connectionLabel = connectionPresentation[connectionState];
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.pageHeadingRow}>
         <Text style={styles.title}>Tools</Text>
-        <View style={styles.connectionStatus}>
-          <View
-            accessibilityElementsHidden
-            style={[
-              styles.connectionIndicator,
-              { backgroundColor: connection.colour },
-            ]}
-          />
-          <Text
-            accessibilityLabel={`Bluetooth status: ${connection.label}`}
-            style={styles.connectionLabel}
-          >
-            {connection.label}
-          </Text>
-        </View>
+        <Button
+          accessibilityLabel={`Bluetooth status: ${connectionLabel}`}
+          color={accentColor}
+          disabled={connectionState !== 'disconnected' || sending !== null}
+          onPress={connect}
+          title={connectionLabel}
+        />
       </View>
 
       <View style={styles.toolCard}>
@@ -348,21 +348,6 @@ const styles = StyleSheet.create({
     color: primaryTextColor,
     fontSize: 22,
     fontWeight: '700',
-  },
-  connectionStatus: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-  },
-  connectionIndicator: {
-    borderRadius: 5,
-    height: 10,
-    width: 10,
-  },
-  connectionLabel: {
-    color: secondaryTextColor,
-    fontSize: 15,
-    fontWeight: '600',
   },
   textInput: {
     backgroundColor: cardBackgroundColor,
