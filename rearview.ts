@@ -23,6 +23,10 @@ function fileURL(path: string): string {
   return path.startsWith('file://') ? path : `file://${path}`;
 }
 
+export function supportsModelGpu(bundlePath: string): boolean {
+  return !bundlePath.includes('/CoreSimulator/');
+}
+
 export async function loadSavedPrompt(): Promise<string> {
   if (!(await RNFS.exists(PROMPT_PATH))) {
     return DEFAULT_PROMPT;
@@ -42,11 +46,12 @@ export async function savePrompt(prompt: string): Promise<void> {
 
 async function initializeRearview(status: StatusCallback): Promise<void> {
   status('Loading bundled language model…');
+  const useGpu = supportsModelGpu(RNFS.MainBundlePath);
 
   const nextContext = await initLlama({
     model: MODEL_NAME,
     is_model_asset: true,
-    n_gpu_layers: 99,
+    n_gpu_layers: useGpu ? 99 : 0,
     n_ctx: 512,
     ctx_shift: false,
     flash_attn: true,
@@ -57,7 +62,7 @@ async function initializeRearview(status: StatusCallback): Promise<void> {
 
     const multimodalLoaded = await nextContext.initMultimodal({
       path: fileURL(`${RNFS.MainBundlePath}/${PROJECTOR_NAME}`),
-      use_gpu: true,
+      use_gpu: useGpu,
       image_min_tokens: 64,
       image_max_tokens: 256,
     });

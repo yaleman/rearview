@@ -7,6 +7,8 @@ service, and maps that command to a 72 x 40 SSD1306 OLED.
 The Rearview app implements the client in `bluetoothRgb.ts` and exposes it on the
 Tools screen. It scans for the advertised service and device name, connects,
 discovers the GATT table, and writes the slider values with a response.
+The iOS simulator can render that UI but cannot discover or write to this BLE
+device, so client integration must be tested on a physical iPhone.
 
 ## Hardware
 
@@ -15,9 +17,9 @@ The display is an SSD1306-compatible 72 x 40 monochrome OLED at I2C address
 `0x3C`.
 
 | OLED signal | ESP32-C3 pin |
-| --- | --- |
-| SDA | GPIO5 |
-| SCL | GPIO6 |
+| ----------- | ------------ |
+| SDA         | GPIO5        |
+| SCL         | GPIO6        |
 
 Connect ground between the board and display, and power the display according
 to the voltage requirements of the specific module. The firmware scans the I2C
@@ -70,27 +72,31 @@ Do not commit it.
 
 ### Transport and security
 
-| Field | Value |
-| --- | --- |
-| Advertised device name | `Rearview Light` |
-| Transport | Bluetooth Low Energy GATT |
-| Connections | One client maximum |
-| Pairing mode | Secure Connections, MITM, bonding |
-| I/O capability | Display only |
-| Static passkey | `123456` |
-| Encryption key size | 16 bytes |
+| Field                  | Value                             |
+| ---------------------- | --------------------------------- |
+| Advertised device name | `Rearview Light`                  |
+| Transport              | Bluetooth Low Energy GATT         |
+| Connections            | One client maximum                |
+| Pairing mode           | Secure Connections, MITM, bonding |
+| I/O capability         | Display only                      |
+| Static passkey         | `123456`                          |
+| Encryption key size    | 16 bytes                          |
 
 The static passkey is configured after the Bluetooth stack becomes ready. A
 client must pair using `123456`; successful pairing may be retained through BLE
 bonding. Treat the passkey as device access control, not as a secret unique to an
-installation.
+installation. When the ESP-IDF Bluetooth stack requests passkey display, the
+firmware shows the actual six-digit value across the OLED and logs it as
+`BLE pairing passkey: 123456` through the ESPHome logger. Once authentication
+finishes, the OLED returns to the most recent RGB command, or turns off if no
+command has been received.
 
 ### GATT service
 
-| Item | UUID | Properties |
-| --- | --- | --- |
+| Item                       | UUID                                   | Properties |
+| -------------------------- | -------------------------------------- | ---------- |
 | Rearview indicator service | `898a0c20-6d38-4a49-9f84-f942b4cd9380` | Advertised |
-| Colour characteristic | `898a0c21-6d38-4a49-9f84-f942b4cd9380` | Write |
+| Colour characteristic      | `898a0c21-6d38-4a49-9f84-f942b4cd9380` | Write      |
 
 The colour characteristic also exposes the standard Characteristic User
 Description descriptor (`0x2901`) with the text `RGB colour and brightness`.
@@ -102,12 +108,12 @@ firmware-version characteristics.
 
 Write exactly four bytes to the colour characteristic:
 
-| Offset | Name | Range | Meaning |
-| --- | --- | --- | --- |
-| 0 | Red | 0-255 | Red channel intensity |
-| 1 | Green | 0-255 | Green channel intensity |
-| 2 | Blue | 0-255 | Blue channel intensity |
-| 3 | Brightness | 0-255 | Scale applied to all three channels |
+| Offset | Name       | Range | Meaning                             |
+| ------ | ---------- | ----- | ----------------------------------- |
+| 0      | Red        | 0-255 | Red channel intensity               |
+| 1      | Green      | 0-255 | Green channel intensity             |
+| 2      | Blue       | 0-255 | Blue channel intensity              |
+| 3      | Brightness | 0-255 | Scale applied to all three channels |
 
 The payload has no header, length field, version, checksum, or byte-order
 concern: each field is a single unsigned byte. For example, the byte sequence

@@ -64,6 +64,12 @@ class BLEServer final : public Component, public Parented<ESP32BLE> {
   void on_disconnect(std::function<void(uint16_t)> &&callback) {
     this->callbacks_.push_back({CallbackType::ON_DISCONNECT, std::move(callback)});
   }
+  void on_pairing_passkey(std::function<void(uint32_t)> &&callback) {
+    this->pairing_passkey_callbacks_.push_back(std::move(callback));
+  }
+  void on_pairing_complete(std::function<void(bool)> &&callback) {
+    this->pairing_complete_callbacks_.push_back(std::move(callback));
+  }
 
  protected:
   enum class CallbackType : uint8_t {
@@ -90,6 +96,8 @@ class BLEServer final : public Component, public Parented<ESP32BLE> {
   void dispatch_callbacks_(CallbackType type, uint16_t conn_id);
 
   std::vector<CallbackEntry> callbacks_;
+  std::vector<std::function<void(uint32_t)>> pairing_passkey_callbacks_;
+  std::vector<std::function<void(bool)>> pairing_complete_callbacks_;
 
   std::vector<uint8_t> manufacturer_data_{};
   esp_gatt_if_t gatts_if_{0};

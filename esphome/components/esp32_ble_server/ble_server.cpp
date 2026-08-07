@@ -15,6 +15,7 @@
 #endif
 #include <freertos/task.h>
 #include <esp_gap_ble_api.h>
+#include <inttypes.h>
 
 namespace esphome::esp32_ble_server {
 
@@ -205,8 +206,17 @@ void BLEServer::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
       }
       break;
     }
+    case ESP_GAP_BLE_PASSKEY_NOTIF_EVT: {
+      const uint32_t passkey = param->ble_security.key_notif.passkey;
+      ESP_LOGI(TAG, "BLE pairing passkey: %06" PRIu32, passkey);
+      for (auto &callback : this->pairing_passkey_callbacks_) {
+        callback(passkey);
+      }
+      break;
+    }
     case ESP_GAP_BLE_AUTH_CMPL_EVT: {
-      if (param->ble_security.auth_cmpl.success) {
+      const bool success = param->ble_security.auth_cmpl.success;
+      if (success) {
         ESP_LOGI(TAG, "BLE client authenticated and bonded");
       } else {
         ESP_LOGW(TAG, "BLE client authentication failed: 0x%02X", param->ble_security.auth_cmpl.fail_reason);
@@ -214,6 +224,9 @@ void BLEServer::gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
         if (err != ESP_OK) {
           ESP_LOGW(TAG, "Failed to disconnect unauthenticated BLE client: %d", err);
         }
+      }
+      for (auto &callback : this->pairing_complete_callbacks_) {
+        callback(success);
       }
       break;
     }

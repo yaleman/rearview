@@ -31,6 +31,12 @@ class BLETriggers {
 #ifdef USE_ESP32_BLE_SERVER_ON_DISCONNECT
   static Trigger<uint16_t> *create_server_on_disconnect_trigger(BLEServer *server);
 #endif
+#ifdef USE_ESP32_BLE_SERVER_ON_PAIRING_PASSKEY
+  static Trigger<uint32_t> *create_server_on_pairing_passkey_trigger(BLEServer *server);
+#endif
+#ifdef USE_ESP32_BLE_SERVER_ON_PAIRING_COMPLETE
+  static Trigger<bool> *create_server_on_pairing_complete_trigger(BLEServer *server);
+#endif
 };
 
 #ifdef USE_ESP32_BLE_SERVER_SET_VALUE_ACTION

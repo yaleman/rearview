@@ -2,6 +2,12 @@
 $VCEnableLocation = false
 $VCEnableFrameProcessors = false
 
+# React Native 0.86.2's prebuilt React.framework omits C++ symbols required by
+# generated components such as safe-area-context and RNCSlider. Build React
+# Native and its dependencies from source so codegen and linked objects match.
+ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+ENV['RCT_USE_RN_DEP'] = '0'
+
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",

@@ -49,6 +49,16 @@ external_components:
 
 logger:
 
+globals:
+  - id: last_rgb_command
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: has_rgb_command
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
 esp32_ble:
   name: Rearview Light
   io_capability: display_only
@@ -75,6 +85,61 @@ esp32_ble_server:
   manufacturer: Rearview
   model: RGB Indicator
   max_clients: 1
+  on_pairing_passkey:
+    then:
+      - lambda: |-
+          static const uint16_t DIGITS[10] = {
+              0b111101101101111,
+              0b010110010010111,
+              0b111001111100111,
+              0b111001111001111,
+              0b101101111001001,
+              0b111100111001111,
+              0b111100111101111,
+              0b111001001001001,
+              0b111101111101111,
+              0b111101111001111,
+          };
+
+          char code[7];
+          snprintf(code, sizeof(code), "%06u", static_cast<unsigned int>(passkey));
+          id(oled).turn_on();
+          id(oled).fill(Color(0, 0, 0));
+          for (uint8_t digit = 0; digit < 6; digit++) {
+            const uint16_t glyph = DIGITS[code[digit] - '0'];
+            for (uint8_t row = 0; row < 5; row++) {
+              for (uint8_t column = 0; column < 3; column++) {
+                const uint8_t bit = 14 - (row * 3 + column);
+                if ((glyph & (1U << bit)) != 0) {
+                  id(oled).filled_rectangle(4 + digit * 11 + column * 3, 12 + row * 3, 3, 3, Color(255, 255, 255));
+                }
+              }
+            }
+          }
+          id(oled).update();
+  on_pairing_complete:
+    then:
+      - lambda: |-
+          if (!id(has_rgb_command)) {
+            id(oled).fill(Color(0, 0, 0));
+            id(oled).update();
+            id(oled).turn_off();
+            return;
+          }
+
+          const uint32_t command = id(last_rgb_command);
+          auto colour = Color(
+              (command >> 24) & 0xFF,
+              (command >> 16) & 0xFF,
+              (command >> 8) & 0xFF) * (command & 0xFF);
+          if (colour.is_on()) {
+            id(oled).turn_on();
+          }
+          id(oled).fill(colour);
+          id(oled).update();
+          if (!colour.is_on()) {
+            id(oled).turn_off();
+          }
   services:
     - uuid: 898a0c20-6d38-4a49-9f84-f942b4cd9380
       advertise: true
@@ -91,6 +156,12 @@ esp32_ble_server:
                     return;
                   }
 
+                  id(last_rgb_command) =
+                      (static_cast<uint32_t>(x[0]) << 24) |
+                      (static_cast<uint32_t>(x[1]) << 16) |
+                      (static_cast<uint32_t>(x[2]) << 8) |
+                      x[3];
+                  id(has_rgb_command) = true;
                   auto colour = Color(x[0], x[1], x[2]) * x[3];
                   if (!colour.is_on()) {
                     id(oled).fill(colour);

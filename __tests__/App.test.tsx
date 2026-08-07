@@ -27,6 +27,15 @@ jest.mock('../imageAnalysis', () => ({
   deleteTemporaryImage: jest.fn(),
 }));
 
+jest.mock('../ToolsScreen', () => {
+  const ReactModule = require('react');
+  const { Text: NativeText } = require('react-native');
+
+  return function MockToolsScreen() {
+    return ReactModule.createElement(NativeText, null, 'Tools screen');
+  };
+});
+
 jest.mock('../LiveCameraScanner', () => {
   const ReactModule = require('react');
   const { Button } = require('react-native');
@@ -97,6 +106,24 @@ test('loads the saved prompt and bundled model on launch', async () => {
     renderer.root.findByProps({ title: 'Start continuous camera' }).props
       .disabled,
   ).toBe(false);
+});
+
+test('opens the tools screen from the app navigation', async () => {
+  const renderer = await renderApp();
+  const tabs = renderer.root
+    .findAllByProps({ accessibilityRole: 'tab' })
+    .filter(node => typeof node.props.onPress === 'function');
+
+  expect(tabs).toHaveLength(2);
+  expect(tabs[0].props.accessibilityState).toEqual({ selected: true });
+
+  act(() => tabs[1].props.onPress());
+
+  expect(
+    renderer.root
+      .findAllByType(Text)
+      .some(node => node.props.children === 'Tools screen'),
+  ).toBe(true);
 });
 
 test('renders a visible prompt field in light and dark appearance', async () => {

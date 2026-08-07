@@ -62,6 +62,21 @@ pnpm start
 pnpm ios
 ```
 
+To build and launch directly on the iPhone 17 Pro simulator, run:
+
+```sh
+mise sim
+```
+
+The task starts Metro in the current terminal, waits for it to become ready,
+then builds and launches the app. Keep it running while using the app; press
+Ctrl-C to stop Metro. Model inference uses the CPU in the simulator because the
+simulator Metal driver cannot load the bundled vision projector safely; physical
+devices continue to use Metal acceleration.
+
+The simulator can display and exercise the Tools UI, but it cannot discover or
+write to the companion BLE indicator. Test **Send RGB** on a physical iPhone.
+
 Camera analysis requires a device or simulator with an available rear camera.
 Photo-library analysis can still be used independently.
 
@@ -93,9 +108,23 @@ predicted tokens to keep the monitoring loop responsive on a phone.
 `esphome/` contains firmware for an ESP32-C3 and SSD1306 OLED that exposes a
 small BLE colour-and-brightness protocol. Open the app's Tools screen, adjust the
 four channel sliders, and tap **Send** to discover `Rearview Light` and write the
-command. The first connection may prompt for the indicator's BLE passkey. Its
+command. BLE discovery and writes require a physical iPhone and do not work in
+the iOS simulator. The first connection may prompt for the indicator's BLE passkey. Its
 hardware layout, build instructions, security settings, and wire protocol are
 documented in [`esphome/README.md`](esphome/README.md).
+
+### ESP32-C3 case
+
+`hardware/esp32-c3-case.scad` is a printable open tray for the 20 x 25 mm
+ESP32-C3 board. It has a 2 mm base, three 2 mm walls, and an open USB end. The
+model allows 0.3 mm clearance around the board and defaults to walls 6 mm above
+the base; both values are parameters at the top of the OpenSCAD file.
+
+Export the printable STL with OpenSCAD:
+
+```sh
+openscad -o hardware/esp32-c3-case.stl hardware/esp32-c3-case.scad
+```
 
 ## Development checks
 
@@ -113,15 +142,16 @@ continuous capture.
 
 ## Project layout
 
-| Path | Purpose |
-| --- | --- |
-| `App.tsx` | Main screen, saved prompt, library picker, and displayed results |
-| `LiveCameraScanner.tsx` | Rear-camera permission, capture, and continuous analysis loop |
-| `imageAnalysis.ts` | Image resize, temporary-file cleanup, and inference handoff |
-| `rearview.ts` | Bundled model initialization, prompt storage, and multimodal inference |
-| `ToolsScreen.tsx` | Companion-indicator controls and send status |
-| `bluetoothRgb.ts` | BLE discovery, connection, payload encoding, and writes |
-| `__tests__/` | Jest unit and component tests |
-| `models/` | Downloaded GGUF model and projector files; ignored by Git |
-| `scripts/` | Model download and signed iOS device deployment |
-| `esphome/` | BLE indicator firmware and protocol documentation |
+| Path                    | Purpose                                                                |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `App.tsx`               | Main screen, saved prompt, library picker, and displayed results       |
+| `LiveCameraScanner.tsx` | Rear-camera permission, capture, and continuous analysis loop          |
+| `imageAnalysis.ts`      | Image resize, temporary-file cleanup, and inference handoff            |
+| `rearview.ts`           | Bundled model initialization, prompt storage, and multimodal inference |
+| `ToolsScreen.tsx`       | Companion-indicator controls and send status                           |
+| `bluetoothRgb.ts`       | BLE discovery, connection, payload encoding, and writes                |
+| `__tests__/`            | Jest unit and component tests                                          |
+| `models/`               | Downloaded GGUF model and projector files; ignored by Git              |
+| `scripts/`              | Model download and signed iOS device deployment                        |
+| `esphome/`              | BLE indicator firmware and protocol documentation                      |
+| `hardware/`             | Printable OpenSCAD designs for companion hardware                      |

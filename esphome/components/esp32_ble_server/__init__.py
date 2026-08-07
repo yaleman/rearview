@@ -45,6 +45,8 @@ CONF_MANUFACTURER = "manufacturer"
 CONF_MANUFACTURER_DATA = "manufacturer_data"
 CONF_MAX_CLIENTS = "max_clients"
 CONF_ON_WRITE = "on_write"
+CONF_ON_PAIRING_COMPLETE = "on_pairing_complete"
+CONF_ON_PAIRING_PASSKEY = "on_pairing_passkey"
 CONF_READ = "read"
 CONF_STRING = "string"
 CONF_STRING_ENCODING = "string_encoding"
@@ -475,6 +477,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SERVICES, default=[]): cv.ensure_list(SERVICE_SCHEMA),
         cv.Optional(CONF_ON_CONNECT): automation.validate_automation(single=True),
         cv.Optional(CONF_ON_DISCONNECT): automation.validate_automation(single=True),
+        cv.Optional(CONF_ON_PAIRING_PASSKEY): automation.validate_automation(single=True),
+        cv.Optional(CONF_ON_PAIRING_COMPLETE): automation.validate_automation(single=True),
     },
     extra_schemas=[create_device_information_service],
 ).extend(cv.COMPONENT_SCHEMA)
@@ -630,6 +634,20 @@ async def to_code(config):
             BLETriggers_ns.create_server_on_disconnect_trigger(var),
             [(cg.uint16, "id")],
             config[CONF_ON_DISCONNECT],
+        )
+    if CONF_ON_PAIRING_PASSKEY in config:
+        cg.add_define("USE_ESP32_BLE_SERVER_ON_PAIRING_PASSKEY")
+        await automation.build_automation(
+            BLETriggers_ns.create_server_on_pairing_passkey_trigger(var),
+            [(cg.uint32, "passkey")],
+            config[CONF_ON_PAIRING_PASSKEY],
+        )
+    if CONF_ON_PAIRING_COMPLETE in config:
+        cg.add_define("USE_ESP32_BLE_SERVER_ON_PAIRING_COMPLETE")
+        await automation.build_automation(
+            BLETriggers_ns.create_server_on_pairing_complete_trigger(var),
+            [(cg.bool_, "success")],
+            config[CONF_ON_PAIRING_COMPLETE],
         )
     cg.add_define("USE_ESP32_BLE_SERVER")
     cg.add_define("USE_ESP32_BLE_ADVERTISING")

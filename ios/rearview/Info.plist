@@ -35,6 +35,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo for local scene analysis.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Connect to the Rearview indicator and send its display colour.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Select an image for local scene analysis.</string>
 	<key>RCTNewArchEnabled</key>

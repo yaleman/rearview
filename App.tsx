@@ -3,6 +3,7 @@ import {
   Button,
   DynamicColorIOS,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,7 @@ import {
 } from 'react-native-image-picker';
 
 import LiveCameraScanner from './LiveCameraScanner';
+import ToolsScreen from './ToolsScreen';
 import {
   analyzeImage,
   deleteTemporaryImage,
@@ -29,6 +31,7 @@ import {
 } from './rearview';
 
 type ModelState = 'loading' | 'ready' | 'error';
+type AppScreen = 'rearview' | 'tools';
 
 const IMAGE_OPTIONS = {
   mediaType: 'photo' as const,
@@ -78,6 +81,7 @@ function cleanupTemporaryImage(path: string): void {
 }
 
 export default function App(): React.JSX.Element {
+  const [appScreen, setAppScreen] = useState<AppScreen>('rearview');
   const [status, setStatus] = useState('Loading bundled model…');
   const [modelState, setModelState] = useState<ModelState>('loading');
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -238,110 +242,144 @@ export default function App(): React.JSX.Element {
       edges={['top', 'right', 'bottom', 'left']}
       style={styles.screen}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        {!cameraActive && (
-          <>
-            <Text style={styles.title}>Rearview</Text>
+      {!cameraActive && (
+        <View accessibilityRole="tablist" style={styles.navigation}>
+          {(['rearview', 'tools'] as const).map(screen => {
+            const selected = appScreen === screen;
+            const label = screen === 'rearview' ? 'Rearview' : 'Tools';
 
-            <View style={styles.statusBox}>
-              <Text selectable style={styles.statusText}>
-                {status}
-              </Text>
-            </View>
+            return (
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                key={screen}
+                onPress={() => setAppScreen(screen)}
+                style={[styles.navigationTab, selected && styles.selectedTab]}
+              >
+                <Text
+                  style={[
+                    styles.navigationLabel,
+                    selected && styles.selectedNavigationLabel,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
-            <View style={styles.promptBox}>
-              <Text style={styles.fieldLabel}>Prompt</Text>
-              <TextInput
-                accessibilityLabel="Analysis prompt"
-                multiline
-                onChangeText={setPrompt}
-                style={styles.promptInput}
-                value={prompt}
-              />
-              <Button
-                color={accentColor}
-                title={savingPrompt ? 'Saving…' : 'Save prompt'}
-                disabled={
-                  savingPrompt || promptIsEmpty || prompt === savedPrompt
-                }
-                onPress={handleSavePrompt}
-              />
-            </View>
-          </>
-        )}
+      {appScreen === 'tools' ? (
+        <ToolsScreen />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {!cameraActive && (
+            <>
+              <Text style={styles.title}>Rearview</Text>
 
-        <LiveCameraScanner
-          canAnalyze={canAnalyze}
-          onActiveChange={handleCameraActiveChange}
-          onBusyChange={handleCameraBusyChange}
-          onResult={handleAnalysisResult}
-          onStatus={handleCameraStatus}
-          prompt={prompt}
-        />
-
-        {!cameraActive && (
-          <View style={styles.actions}>
-            <Button
-              color={accentColor}
-              title={analysisBusy ? 'Working…' : 'Choose and analyse photo'}
-              disabled={analysisBusy || !canAnalyze}
-              onPress={chooseImage}
-            />
-          </View>
-        )}
-
-        {cameraActive && imageURI === null && (
-          <View style={styles.previewPlaceholder}>
-            <Text style={styles.statusText}>Waiting for first analysis…</Text>
-          </View>
-        )}
-
-        {imageURI !== null && (
-          <Image
-            source={{ uri: imageURI }}
-            style={styles.preview}
-            resizeMode="contain"
-          />
-        )}
-
-        {description !== '' && (
-          <View style={styles.resultBox}>
-            <Text style={styles.resultTitle}>Result</Text>
-            <Text selectable style={styles.resultText}>
-              {description}
-            </Text>
-
-            {elapsed !== null && (
-              <Text selectable style={styles.timing}>
-                Inference: {(elapsed / 1000).toFixed(3)} seconds
-              </Text>
-            )}
-            {resizeElapsed !== null && imageDimensions !== null && (
-              <Text selectable style={styles.timingDetail}>
-                Input: {imageDimensions} · resize: {resizeElapsed} ms
-              </Text>
-            )}
-          </View>
-        )}
-
-        {timings !== null && (
-          <>
-            <Button
-              color={accentColor}
-              onPress={() => setDetailsExpanded(expanded => !expanded)}
-              title={detailsExpanded ? 'Hide diagnostics' : 'Show diagnostics'}
-            />
-            {detailsExpanded && (
-              <View style={styles.timingBox}>
-                <Text style={styles.resultTitle}>llama.cpp timings</Text>
-                <Text selectable style={styles.monospace}>
-                  {JSON.stringify(timings, null, 2)}
+              <View style={styles.statusBox}>
+                <Text selectable style={styles.statusText}>
+                  {status}
                 </Text>
               </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+
+              <View style={styles.promptBox}>
+                <Text style={styles.fieldLabel}>Prompt</Text>
+                <TextInput
+                  accessibilityLabel="Analysis prompt"
+                  multiline
+                  onChangeText={setPrompt}
+                  style={styles.promptInput}
+                  value={prompt}
+                />
+                <Button
+                  color={accentColor}
+                  title={savingPrompt ? 'Saving…' : 'Save prompt'}
+                  disabled={
+                    savingPrompt || promptIsEmpty || prompt === savedPrompt
+                  }
+                  onPress={handleSavePrompt}
+                />
+              </View>
+            </>
+          )}
+
+          <LiveCameraScanner
+            canAnalyze={canAnalyze}
+            onActiveChange={handleCameraActiveChange}
+            onBusyChange={handleCameraBusyChange}
+            onResult={handleAnalysisResult}
+            onStatus={handleCameraStatus}
+            prompt={prompt}
+          />
+
+          {!cameraActive && (
+            <View style={styles.actions}>
+              <Button
+                color={accentColor}
+                title={analysisBusy ? 'Working…' : 'Choose and analyse photo'}
+                disabled={analysisBusy || !canAnalyze}
+                onPress={chooseImage}
+              />
+            </View>
+          )}
+
+          {cameraActive && imageURI === null && (
+            <View style={styles.previewPlaceholder}>
+              <Text style={styles.statusText}>Waiting for first analysis…</Text>
+            </View>
+          )}
+
+          {imageURI !== null && (
+            <Image
+              source={{ uri: imageURI }}
+              style={styles.preview}
+              resizeMode="contain"
+            />
+          )}
+
+          {description !== '' && (
+            <View style={styles.resultBox}>
+              <Text style={styles.resultTitle}>Result</Text>
+              <Text selectable style={styles.resultText}>
+                {description}
+              </Text>
+
+              {elapsed !== null && (
+                <Text selectable style={styles.timing}>
+                  Inference: {(elapsed / 1000).toFixed(3)} seconds
+                </Text>
+              )}
+              {resizeElapsed !== null && imageDimensions !== null && (
+                <Text selectable style={styles.timingDetail}>
+                  Input: {imageDimensions} · resize: {resizeElapsed} ms
+                </Text>
+              )}
+            </View>
+          )}
+
+          {timings !== null && (
+            <>
+              <Button
+                color={accentColor}
+                onPress={() => setDetailsExpanded(expanded => !expanded)}
+                title={
+                  detailsExpanded ? 'Hide diagnostics' : 'Show diagnostics'
+                }
+              />
+              {detailsExpanded && (
+                <View style={styles.timingBox}>
+                  <Text style={styles.resultTitle}>llama.cpp timings</Text>
+                  <Text selectable style={styles.monospace}>
+                    {JSON.stringify(timings, null, 2)}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -355,6 +393,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     gap: 16,
+  },
+  navigation: {
+    backgroundColor: cardBackgroundColor,
+    borderColor,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 3,
+  },
+  navigationTab: {
+    alignItems: 'center',
+    borderRadius: 7,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  selectedTab: {
+    backgroundColor: accentColor,
+  },
+  navigationLabel: {
+    color: primaryTextColor,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  selectedNavigationLabel: {
+    color: '#ffffff',
   },
   title: {
     color: primaryTextColor,

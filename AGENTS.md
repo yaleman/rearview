@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its local BLE server component is under `esphome/components/`, and its hardware and protocol contract are documented in `esphome/README.md`.
+`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its local BLE server component is under `esphome/components/`, and its hardware and protocol contract are documented in `esphome/README.md`. Printable companion-hardware designs live in `hardware/`; keep source OpenSCAD files parameterized and do not commit generated STL files.
 
 Always update the README.md and AGENTS.md when there's something people or robots need to know.
 
@@ -17,8 +17,18 @@ Use Node.js 22.11 or newer and `pnpm` for JavaScript dependencies.
 - `pnpm lint` runs the React Native ESLint rules across the repository.
 - `pnpm exec tsc --noEmit` performs a TypeScript type check without generating files.
 - `mise models` downloads and checksum-verifies the bundled GGUF files.
+- `mise sim` starts Metro, builds, and launches the app on the iPhone 17 Pro simulator; keep the task running while using the app. Simulator model loading is CPU-only because Metal vision-projector allocation traps in the simulator runtime.
 - `mise device` builds, installs, and launches a signed Release build on the locally configured device.
 - `cd esphome && uvx --from esphome==2026.7.4 esphome config rearview-indicator.yaml` validates the companion firmware configuration.
+
+The iOS simulator can exercise the Tools UI but cannot discover or write to the
+companion BLE indicator. Treat physical-iPhone evidence as required for BLE
+behavior; simulator UI or build success is not BLE runtime validation.
+
+The firmware pairing UI is driven by the ESP-IDF passkey-notification event: show
+and log that event's six-digit value, then restore the previous OLED state when
+authentication completes. Do not infer the displayed code from the configured
+static passkey.
 
 After changing iOS-native dependencies, run `pod install --project-directory=ios`.
 Keep the React Native source-build overrides in `ios/Podfile`: the React Native

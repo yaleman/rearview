@@ -10,6 +10,11 @@ outputs = [
   "models/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf",
 ]
 
+[tasks.sim]
+description = "Build and launch on the iPhone 17 Pro simulator"
+depends = ["models"]
+run = "./scripts/sim.sh"
+
 [tasks."device:build"]
 description = "Build a signed Release app for the configured device"
 depends = ["models"]
@@ -29,3 +34,7 @@ run = "./scripts/device.sh launch"
 description = "Build, install, and launch on the configured device"
 depends = ["models"]
 run = "./scripts/device.sh deploy"
+
+[tasks.esp]
+dir = "esphome"
+run = ["uvx esphome run rearview-indicator.yaml"]

@@ -30,6 +30,7 @@ import {
   loadRearview,
   loadSavedPrompt,
   savePrompt,
+  supportsModelGpu,
 } from '../rearview';
 
 beforeEach(() => {
@@ -75,6 +76,17 @@ test('loads and saves prompt text in app documents', async () => {
 
 test('rejects an empty prompt', async () => {
   await expect(savePrompt('  ')).rejects.toBeInstanceOf(EmptyPromptError);
+});
+
+test('disables model GPU allocation in the iOS simulator', () => {
+  expect(
+    supportsModelGpu(
+      '/Users/test/Library/Developer/CoreSimulator/Devices/device/rearview.app',
+    ),
+  ).toBe(false);
+  expect(supportsModelGpu('/private/var/containers/Bundle/rearview.app')).toBe(
+    true,
+  );
 });
 
 test('loads bundled models and analyzes with the supplied prompt', async () => {
