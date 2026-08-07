@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `android/` and `ios/`. Device workflow scripts live in `scripts/`.
+`App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `android/` and `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its local BLE server component is under `esphome/components/`, and its hardware and protocol contract are documented in `esphome/README.md`.
 
 ## Build, Test, and Development Commands
 
@@ -17,6 +17,7 @@ Use Node.js 22.11 or newer and `pnpm` for JavaScript dependencies.
 - `pnpm exec tsc --noEmit` performs a TypeScript type check without generating files.
 - `mise models` downloads and checksum-verifies the bundled GGUF files.
 - `mise device` builds, installs, and launches a signed Release build on the locally configured device.
+- `cd esphome && uvx --from esphome==2026.7.4 esphome config rearview-indicator.yaml` validates the companion firmware configuration.
 
 After changing iOS-native dependencies, run `pod install --project-directory=ios`.
 
