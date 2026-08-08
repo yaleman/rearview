@@ -4,6 +4,11 @@
 
 `App.tsx` contains the main React Native screen. Continuous capture lives in `LiveCameraScanner.tsx`, image preparation in `imageAnalysis.ts`, and bundled-model initialization and inference in `rearview.ts`. The indicator controls live in `ToolsScreen.tsx`, with BLE discovery, connection, and protocol encoding in `bluetoothRgb.ts`. `index.js` is the application entry point. Jest tests live in `__tests__/` and use the `*.test.ts` or `*.test.tsx` suffix. Native projects and platform resources are under `ios/`. Device workflow scripts live in `scripts/`. Companion firmware is configured in `esphome/rearview-indicator.yaml`; its BLE server comes from the `yaleman/esphome-components` GitHub repository, and its hardware and protocol contract are documented in `esphome/README.md`. Printable companion-hardware designs live in `hardware/`; keep source OpenSCAD files parameterized and do not commit generated STL files. The ESP32-C3 tray fits a 20 x 26 mm board and has 3 mm front-wall returns around its centred USB opening.
 
+The app icon source is `assets/rearview-icon.png`. Its VTracer-generated SVG is
+embedded by the Xcode Icon Composer package in `Rearview.icon`; keep the PNG,
+SVG, package metadata, and `ASSETCATALOG_COMPILER_APPICON_NAME` aligned when
+changing the icon.
+
 Always update the README.md and AGENTS.md when there's something people or robots need to know.
 
 ## Build, Test, and Development Commands

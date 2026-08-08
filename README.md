@@ -1,5 +1,20 @@
 # Rearview
 
+## App icon
+
+The generated square source artwork is `assets/rearview-icon.png`. The app uses
+the VTracer-generated `Rearview.icon/Assets/rearview.svg` through the Xcode Icon
+Composer package in `Rearview.icon`.
+
+Regenerate the SVG with VTracer 1.0.0-alpha.3:
+
+```sh
+cargo install vtracer-cli --version 1.0.0-alpha.3
+vtracer assets/rearview-icon.png Rearview.icon/Assets/rearview.svg \
+  --preset poster --hierarchical cutout --max-colors 32 \
+  --simplify 1.5 --optimize 2
+```
+
 Rearview is a React Native app that uses a compact vision-language model to
 describe what the device's rear camera can see. Image preparation and inference
 run locally on the device; the app does not need a hosted inference service.
