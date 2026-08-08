@@ -41,9 +41,7 @@ esp32:
     type: esp-idf
 
 external_components:
-  - source:
-      type: local
-      path: components
+  - source: github://yaleman/esphome-components@main
     components:
       - esp32_ble_server
 

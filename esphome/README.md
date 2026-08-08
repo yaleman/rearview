@@ -34,9 +34,10 @@ below ESPHome's fixed 50 ms script blocking-warning threshold; the previous
 
 - `esp32_ble` configures the Bluetooth device, pairing, bonding, and connection
   limit;
-- the local `components/esp32_ble_server/` external component builds the GATT
-  server, advertised services, characteristics, descriptors, and write
-  automations on top of ESP-IDF;
+- the `esp32_ble_server` external component from
+  `github.com/yaleman/esphome-components` builds the GATT server, advertised
+  services, characteristics, descriptors, and write automations on top of
+  ESP-IDF;
 - `i2c` and `ssd1306_i2c` drive the display without a periodic refresh; and
 - the characteristic's `on_write` lambda validates and applies each command.
 
