@@ -28,6 +28,10 @@ Use Node.js 22.11 or newer and `pnpm` for JavaScript dependencies.
 - `mise run test:testflight-packaging` validates the internal-only export options without uploading.
 - `cd esphome && uvx --from esphome==2026.7.4 esphome config rearview-indicator.yaml` validates the companion firmware configuration.
 
+During a TestFlight upload, the non-blocking warning that the archive lacks a
+matching `hermesvm.framework` dSYM is acceptable to ignore when Xcode also
+reports `Upload succeeded.`; it only limits symbolication of Hermes crash frames.
+
 The iOS simulator can exercise the Tools UI but cannot discover or write to the
 companion BLE indicator. Treat physical-iPhone evidence as required for BLE
 behavior; simulator UI or build success is not BLE runtime validation.
