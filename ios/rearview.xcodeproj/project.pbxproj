@@ -293,7 +293,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yaleman.rearview;
+				PRODUCT_BUNDLE_IDENTIFIER = com.terminaloutcomes.Rearview;
 				PRODUCT_NAME = rearview;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -322,7 +322,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.yaleman.rearview;
+				PRODUCT_BUNDLE_IDENTIFIER = com.terminaloutcomes.Rearview;
 				PRODUCT_NAME = rearview;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

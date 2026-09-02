@@ -35,6 +35,15 @@ description = "Build, install, and launch on the configured device"
 depends = ["models"]
 run = "./scripts/device.sh deploy"
 
+[tasks."test:testflight-packaging"]
+description = "Validate the internal TestFlight export configuration"
+run = "./scripts/test-testflight-export-options.sh"
+
+[tasks."testflight:internal"]
+description = "Archive and upload a uniquely numbered TestFlight Internal Only build"
+depends = ["models", "test:testflight-packaging"]
+run = "./scripts/upload-testflight-internal.sh"
+
 [tasks.esp]
 dir = "esphome"
 run = ["uvx esphome run rearview-indicator.yaml"]

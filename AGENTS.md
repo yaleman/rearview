@@ -24,6 +24,8 @@ Use Node.js 22.11 or newer and `pnpm` for JavaScript dependencies.
 - `mise models` downloads and checksum-verifies the bundled GGUF files.
 - `mise sim` starts Metro, builds, and launches the app on the iPhone 17 Pro simulator; keep the task running while using the app. Simulator model loading is CPU-only because Metal vision-projector allocation traps in the simulator runtime.
 - `mise device` builds, installs, and launches a signed Release build on the locally configured device.
+- `mise run testflight:internal` archives, verifies, and uploads a uniquely numbered TestFlight Internal Only build using the signed-in Xcode account. It retains redacted evidence under `.build/testflight-internal/`; upload success is separate from App Store Connect processing and tester installability.
+- `mise run test:testflight-packaging` validates the internal-only export options without uploading.
 - `cd esphome && uvx --from esphome==2026.7.4 esphome config rearview-indicator.yaml` validates the companion firmware configuration.
 
 The iOS simulator can exercise the Tools UI but cannot discover or write to the

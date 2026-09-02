@@ -7,7 +7,7 @@ set -euo pipefail
 project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 derived_data="$project_root/.build/device-release"
 app_path="$derived_data/Build/Products/Release-iphoneos/rearview.app"
-bundle_id="com.yaleman.rearview"
+bundle_id="com.terminaloutcomes.Rearview"
 action="${1:-}"
 
 redact() {

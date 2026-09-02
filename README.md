@@ -109,6 +109,25 @@ mise run device
 The individual stages are also available as `mise run device:build`,
 `mise run device:install`, and `mise run device:launch`.
 
+## Upload an internal TestFlight build
+
+With the paid Apple Developer account signed into Xcode and
+`REARVIEW_DEVELOPMENT_TEAM` set in the ignored `.envrc`, run:
+
+```sh
+mise run testflight:internal
+```
+
+The task creates a timestamp-numbered Release archive, exports and verifies the
+distribution-signed IPA, then uploads the build as TestFlight Internal Only.
+Artifacts, redacted logs, the IPA checksum, and `report.json` are retained under
+`.build/testflight-internal/<version>-<build>/`. Internal-only builds cannot be
+promoted to external testing or App Store release. A successful upload still
+needs to finish processing in App Store Connect before testers can install it.
+
+Run `mise run test:testflight-packaging` to validate the export configuration
+without archiving or uploading.
+
 ## Use Rearview
 
 Wait for the status to report that the model is ready. Edit and optionally save
